@@ -1,16 +1,17 @@
-## Hi there 👋
+# DevOps Showcase - Flask App on Kubernetes
 
-<!--
-**devops-showcase/devops-showcase** is a ✨ _special_ ✨ repository because its `README.md` (this file) appears on your GitHub profile.
+A simple **Flask-based static website** deployed using **Docker** and **Kubernetes**.  
+This project demonstrates containerization, orchestration, and local deployment on a Kind (Kubernetes in Docker) cluster.  
 
-Here are some ideas to get you started:
+---
 
-- 🔭 I’m currently working on ...
-- 🌱 I’m currently learning ...
-- 👯 I’m looking to collaborate on ...
-- 🤔 I’m looking for help with ...
-- 💬 Ask me about ...
-- 📫 How to reach me: ...
-- 😄 Pronouns: ...
-- ⚡ Fun fact: ...
--->
+## 🚀 Tech Stack
+- **Python (Flask)** – Web framework  
+- **Docker** – Containerization  
+- **Kubernetes (Kind)** – Orchestration & deployment  
+- **YAML** – Kubernetes manifests (Deployment, Service)  
+- *(Optional: GitHub Actions CI/CD)*  
+
+---
+
+## 📂 Project Structure

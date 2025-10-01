@@ -1,6 +1,3 @@
-# -------------------------
-# Monodome Jumpbox Dev Container Dockerfile
-# -------------------------
 # Base image
 FROM ubuntu:22.04
 
@@ -47,17 +44,13 @@ RUN curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "/tmp/aws
     /tmp/aws/install && \
     rm -rf /tmp/aws /tmp/awscliv2.zip
 
-# Copy company logo for login page customization
-COPY logo.jpg /logo.jpg
-
 # Set working directory
 WORKDIR /home/coder/project
 
-# Environment variables from GitHub Actions / Kubernetes
-# These will be dynamically replaced during deployment
-ENV AWS_ACCOUNT_ID=${AWS_ACCOUNT_ID}
-ENV AWS_REGION=${AWS_REGION}
-ENV GITHUB_SHA=${GITHUB_SHA}
+# Optional env vars (commented out for now)
+# ENV AWS_ACCOUNT_ID=${AWS_ACCOUNT_ID}
+# ENV AWS_REGION=${AWS_REGION}
+# ENV GITHUB_SHA=${GITHUB_SHA}
 
 # Expose code-server port
 EXPOSE 8080

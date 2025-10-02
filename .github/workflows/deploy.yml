@@ -24,14 +24,23 @@ jobs:
       - name: Login to ECR
         uses: aws-actions/amazon-ecr-login@v2
       
-      - name: Build Docker image
+      - name: Build and Push Docker image
         run: |
+          # Get AWS Account ID
+          AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+          ECR_REGISTRY="${AWS_ACCOUNT_ID}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com"
+          
+          echo "ECR Registry: $ECR_REGISTRY"
+          echo "Repository: ${{ secrets.ECR_REPOSITORY }}"
+          
+          # Build the image
           docker build -t code-server-app .
-          docker tag code-server-app:latest ${{ secrets.ECR_REPOSITORY }}:latest
-      
-      - name: Push Docker image to ECR
-        run: |
-          docker push ${{ secrets.ECR_REPOSITORY }}:latest
+          
+          # Tag with full ECR path
+          docker tag code-server-app:latest ${ECR_REGISTRY}/${{ secrets.ECR_REPOSITORY }}:latest
+          
+          # Push to ECR
+          docker push ${ECR_REGISTRY}/${{ secrets.ECR_REPOSITORY }}:latest
 
   deploy:
     name: Deploy to EC2 via SSM
@@ -48,7 +57,7 @@ jobs:
       
       - name: Deploy to EC2 via SSM
         run: |
-          # Find the instance ID using the Name tag
+          # Find the instance ID
           INSTANCE_ID=$(aws ec2 describe-instances \
             --filters \
               "Name=instance-state-name,Values=running" \
@@ -56,48 +65,34 @@ jobs:
             --query "Reservations[0].Instances[0].InstanceId" \
             --output text)
           
-          echo "Looking for instance with Name tag: ${{ secrets.EC2_INSTANCE_TAG_NAME }}"
           echo "Found Instance ID: $INSTANCE_ID"
           
-          # Validate Instance ID
           if [ -z "$INSTANCE_ID" ] || [ "$INSTANCE_ID" == "None" ]; then
-            echo "❌ Error: No running instance found with tag Name=${{ secrets.EC2_INSTANCE_TAG_NAME }}"
-            echo "Available running instances:"
-            aws ec2 describe-instances \
-              --filters "Name=instance-state-name,Values=running" \
-              --query "Reservations[].Instances[].[InstanceId,Tags[?Key=='Name'].Value|[0],State.Name]" \
-              --output table
+            echo "Error: No running instance found"
             exit 1
           fi
           
           # Get ECR registry URL
           AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
           ECR_REGISTRY="${AWS_ACCOUNT_ID}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com"
+          FULL_IMAGE="${ECR_REGISTRY}/${{ secrets.ECR_REPOSITORY }}:latest"
           
-          echo "ECR Registry: $ECR_REGISTRY"
-          echo "Repository: ${{ secrets.ECR_REPOSITORY }}"
-          echo "Full Image: ${ECR_REGISTRY}/${{ secrets.ECR_REPOSITORY }}:latest"
+          echo "Deploying image: $FULL_IMAGE"
           
-          # Send deployment command via SSM (using full paths to avoid PATH issues)
+          # Send deployment command
           aws ssm send-command \
             --instance-ids "$INSTANCE_ID" \
             --document-name "AWS-RunShellScript" \
-            --comment "Deploy Code-Server from GitHub Actions" \
+            --comment "Deploy Code-Server" \
             --parameters commands="[
               'echo \"Starting deployment...\"',
               'export PATH=/usr/local/bin:/usr/bin:/bin',
               '/usr/bin/aws ecr get-login-password --region ${{ secrets.AWS_REGION }} | /usr/bin/docker login --username AWS --password-stdin ${ECR_REGISTRY}',
-              'echo \"Stopping existing container...\"',
               '/usr/bin/docker stop code-server || true',
               '/usr/bin/docker rm code-server || true',
-              'echo \"Pulling latest image...\"',
-              '/usr/bin/docker pull ${ECR_REGISTRY}/${{ secrets.ECR_REPOSITORY }}:latest',
-              'echo \"Starting new container...\"',
-              '/usr/bin/docker run -d --name code-server -p 8080:8080 ${ECR_REGISTRY}/${{ secrets.ECR_REPOSITORY }}:latest',
-              'echo \"Deployment complete!\"',
-              '/usr/bin/docker ps | grep code-server || echo \"Container check failed\"'
+              '/usr/bin/docker pull ${FULL_IMAGE}',
+              '/usr/bin/docker run -d --name code-server -p 8080:8080 ${FULL_IMAGE}',
+              '/usr/bin/docker ps | grep code-server'
             ]"
           
-          echo "✅ Deployment command sent successfully!"
-          echo "💡 Check your EC2 instance to verify the container is running"
-          echo "   Run: docker ps"
+          echo "Deployment complete!"
